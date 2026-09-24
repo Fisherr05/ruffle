@@ -220,9 +220,10 @@ pub fn exec<'gc>(
         let storage = matched
             .groups()
             .map(|range| {
-                range.map_or(Value::Undefined, |range| {
-                    activation.strings().substring(text, range).into()
-                })
+                // Flash returns an empty string for a capture group that did not participate.
+                Value::String(range.map_or(istr!(""), |range| {
+                    activation.strings().substring(text, range)
+                }))
             })
             .collect();
 

@@ -279,13 +279,30 @@ pub fn call<'gc>(
 
     let command = args.get_string(activation, 0);
     let responder = args.try_get_object(1).and_then(|o| o.as_responder());
+    let object_encoding_name = AvmString::new_utf8(activation.gc(), "objectEncoding");
+    let object_encoding = Value::Object(this)
+        .get_public_property(object_encoding_name, activation)?
+        .coerce_to_u32(activation)?;
+    let amf_version = if object_encoding == 3 {
+        AMFVersion::AMF3
+    } else {
+        AMFVersion::AMF0
+    };
     let mut arguments = Vec::new();
 
     let mut object_table = FnvHashMap::default();
     for arg in args.get_slice_from(2..) {
-        let value = serialize_value(activation, arg, AMFVersion::AMF0, &mut object_table);
-        arguments.push(Rc::new(value));
+        let value = serialize_value(activation, arg, amf_version, &mut object_table);
+        // Flash Remoting uses an AMF0 array envelope even with objectEncoding=3.
+        // Each argument is then embedded as an AMF3 value.
+        arguments.push(Rc::new(if amf_version == AMFVersion::AMF3 {
+            AMFValue::AMF3(Rc::new(value))
+        } else {
+            value
+        }));
     }
+
+    let body = AMFValue::StrictArray(ObjectId::INVALID, arguments);
 
     if let Some(handle) = connection.handle() {
         if let Some(responder) = responder {
@@ -293,7 +310,7 @@ pub fn call<'gc>(
                 activation.context,
                 handle,
                 command.to_string(),
-                AMFValue::StrictArray(ObjectId::INVALID, arguments),
+                body,
                 responder,
             );
         } else {
@@ -301,7 +318,7 @@ pub fn call<'gc>(
                 activation.context,
                 handle,
                 command.to_string(),
-                AMFValue::StrictArray(ObjectId::INVALID, arguments),
+                body,
             );
         }
 

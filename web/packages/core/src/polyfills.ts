@@ -52,6 +52,28 @@ function polyfillFlashInstances(): void {
                 const ruffleObject =
                     RuffleObjectElement.fromNativeObjectElement(elem);
                 elem.replaceWith(ruffleObject);
+                if (
+                    location.hostname === "ecuapass.aduana.gob.ec" &&
+                    location.pathname.endsWith("/ipt_server/ipt_flex/ipt_new.jsp")
+                ) {
+                    // Ecuapass's history.js only searches for native <object> tags
+                    // when dispatching browserURLChange. Keep a hidden proxy so
+                    // navigation reaches the callback exposed by Ruffle.
+                    const historyProxy = document.createElement("object");
+                    historyProxy.type = "application/x-ruffle-history-proxy";
+                    historyProxy.style.display = "none";
+                    Object.defineProperty(historyProxy, "browserURLChange", {
+                        value: (url: string) => {
+                            const callback = (
+                                ruffleObject as RuffleObjectElement & {
+                                    browserURLChange?: (url: string) => void;
+                                }
+                            ).browserURLChange;
+                            callback?.(url);
+                        },
+                    });
+                    ruffleObject.after(historyProxy);
+                }
             }
         }
         for (const elem of Array.from(embeds)) {

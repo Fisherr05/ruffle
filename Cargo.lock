@@ -4872,6 +4872,7 @@ dependencies = [
  "lzma-rs",
  "naga-agal",
  "nellymoser-rs",
+ "nom 8.0.0",
  "num-bigint",
  "num-derive",
  "num-traits",
