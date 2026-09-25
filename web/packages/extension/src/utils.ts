@@ -5,6 +5,7 @@ const DEFAULT_OPTIONS: Required<Options> = {
     ...Config.DEFAULT_CONFIG,
     // Legacy NPAPI plugins rendered Flash pixels at physical size on Windows.
     physicalPixelScaling: navigator.platform.startsWith("Win"),
+    fullPageCanvasDeviceFonts: navigator.platform.startsWith("Win"),
     textCursorAtEndOnClick: true,
     ruffleEnable: true,
     ignoreOptout: false,

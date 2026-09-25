@@ -62,6 +62,9 @@
     "settings_physical_pixel_scaling": {
         "message": "Draw full-page Flash pixels at physical size (legacy plugins)"
     },
+    "settings_full_page_canvas_device_fonts": {
+        "message": "Use experimental Canvas device fonts in 100% sized Flash"
+    },
     "settings_text_cursor_at_end_on_click": {
         "message": "Move text cursor to the end on click in full-page Flash"
     },

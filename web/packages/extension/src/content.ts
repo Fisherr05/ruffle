@@ -12,7 +12,6 @@ import {
     getOptions,
     getExplicitOptions,
 } from "./utils";
-import { Config } from "ruffle-core";
 import { isMessage } from "./messages";
 
 declare global {
@@ -198,10 +197,8 @@ function isXMLDocument(): boolean {
         type: "load",
         config: {
             physicalPixelScaling: options.physicalPixelScaling,
+            fullPageCanvasDeviceFonts: options.fullPageCanvasDeviceFonts,
             textCursorAtEndOnClick: options.textCursorAtEndOnClick,
-            ...(window.location.hostname === "ecuapass.aduana.gob.ec"
-                ? { deviceFontRenderer: Config.DeviceFontRenderer.Canvas }
-                : {}),
             ...explicitOptions,
             autoplay: options.autostart ? "on" : "auto",
             unmuteOverlay: options.autostart ? "hidden" : "visible",

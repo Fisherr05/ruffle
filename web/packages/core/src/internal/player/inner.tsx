@@ -5,6 +5,7 @@ import {
     ContextMenu,
     DataLoadOptions,
     DEFAULT_CONFIG,
+    DeviceFontRenderer,
     NetworkingAccessMode,
     RenderBackend,
     UnmuteOverlay,
@@ -1022,6 +1023,16 @@ export class InnerPlayer {
                 ...this.config,
                 ...options,
             };
+            if (
+                this.loadedConfig.fullPageCanvasDeviceFonts &&
+                this.loadedConfig.deviceFontRenderer ===
+                    DeviceFontRenderer.Embedded &&
+                this.element.getAttribute("width") === "100%" &&
+                this.element.getAttribute("height") === "100%"
+            ) {
+                this.loadedConfig.deviceFontRenderer =
+                    DeviceFontRenderer.Canvas;
+            }
             this.updatePhysicalPixelScaling();
 
             // Pre-emptively set background color of container while Ruffle/SWF loads.

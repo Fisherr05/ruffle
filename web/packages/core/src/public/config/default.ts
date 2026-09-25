@@ -42,6 +42,7 @@ export const DEFAULT_CONFIG: Required<BaseLoadOptions> = {
     scale: "showAll",
     forceScale: false,
     physicalPixelScaling: false,
+    fullPageCanvasDeviceFonts: false,
     textCursorAtEndOnClick: false,
     frameRate: null,
     wmode: WindowMode.Window,

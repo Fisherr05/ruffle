@@ -619,6 +619,16 @@ export interface BaseLoadOptions {
     physicalPixelScaling?: boolean;
 
     /**
+     * Use the experimental Canvas device-font renderer for Flash objects
+     * declared as 100% wide and 100% high. This helps movies that rely on
+     * fonts installed on the host. The regular device-font setting applies
+     * to other objects.
+     *
+     * @default false
+     */
+    fullPageCanvasDeviceFonts?: boolean;
+
+    /**
      * Move the insertion point to the end after clicking a text input.
      * This compatibility option changes the movie's normal click selection.
      *
