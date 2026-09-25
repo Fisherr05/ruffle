@@ -71,7 +71,7 @@ impl<'gc> TextLine<'gc> {
         movie: Arc<SwfMovie>,
         fallback: EditText<'gc>,
     ) -> Self {
-        TextLine(Gc::new(
+        let line = TextLine(Gc::new(
             context.gc(),
             TextLineData {
                 base: Default::default(),
@@ -90,7 +90,11 @@ impl<'gc> TextLine<'gc> {
                 previous_line: Lock::new(None),
                 next_line: Lock::new(None),
             },
-        ))
+        ));
+        // TextLine cannot expose tabbable children, and its ActionScript
+        // setter rejects changes to this property.
+        line.set_tab_children(context, false);
+        line
     }
 
     pub fn reset_properties(mut self, context: &mut UpdateContext<'gc>) {
