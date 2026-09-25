@@ -93,16 +93,21 @@ impl<'gc> TextLine<'gc> {
         ))
     }
 
-    pub fn reset_properties(self, mc: &Mutation<'gc>) {
+    pub fn reset_properties(mut self, context: &mut UpdateContext<'gc>) {
         // TODO: Reset more properties
+
+        // Recreated TextLines discard children added to the previous line,
+        // including decorations such as underlines.
+        let child_count = self.num_children();
+        self.remove_range(context, 0..child_count);
 
         // Reset display object properties
         self.set_x(Twips::ZERO);
         self.set_y(Twips::ZERO);
 
         // Reset text line properties
-        self.set_validity(TextLineValidity::Valid, mc);
-        self.set_text_block(None, mc);
+        self.set_validity(TextLineValidity::Valid, context.gc());
+        self.set_text_block(None, context.gc());
         self.set_hide_block_from_script(false);
 
         self.set_specified_width(0.0);
@@ -111,8 +116,8 @@ impl<'gc> TextLine<'gc> {
         self.set_end_index(0);
         self.set_line_index(0);
 
-        self.set_previous_line(None, mc);
-        self.set_next_line(None, mc);
+        self.set_previous_line(None, context.gc());
+        self.set_next_line(None, context.gc());
     }
 
     /// Release this line from its siblings and the block it's in.

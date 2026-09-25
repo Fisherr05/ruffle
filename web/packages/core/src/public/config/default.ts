@@ -41,6 +41,8 @@ export const DEFAULT_CONFIG: Required<BaseLoadOptions> = {
     quality: null,
     scale: "showAll",
     forceScale: false,
+    physicalPixelScaling: false,
+    textCursorAtEndOnClick: false,
     frameRate: null,
     wmode: WindowMode.Window,
     publicPath: null,

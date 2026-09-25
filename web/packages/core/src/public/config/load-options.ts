@@ -610,6 +610,23 @@ export interface BaseLoadOptions {
     forceScale?: boolean;
 
     /**
+     * Draw Flash pixels at physical screen size, as older browser plugins did.
+     * The player still occupies its full CSS box. This is useful for content
+     * authored for plugins without HiDPI scaling.
+     *
+     * @default false
+     */
+    physicalPixelScaling?: boolean;
+
+    /**
+     * Move the insertion point to the end after clicking a text input.
+     * This compatibility option changes the movie's normal click selection.
+     *
+     * @default false
+     */
+    textCursorAtEndOnClick?: boolean;
+
+    /**
      * If set to true, the Stage's displayState can be changed
      *
      * @default false

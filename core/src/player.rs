@@ -35,7 +35,9 @@ use crate::display_object::{
 };
 use crate::events::GamepadButton;
 use crate::events::PlayerNotification;
-use crate::events::{ButtonKeyCode, ClipEvent, ClipEventResult, KeyCode, MouseButton, PlayerEvent};
+use crate::events::{
+    ButtonKeyCode, ClipEvent, ClipEventResult, KeyCode, MouseButton, PlayerEvent, TextControlCode,
+};
 use crate::external::{ExternalInterface, ExternalInterfaceProvider, NullFsCommandProvider};
 use crate::external::{FsCommandProvider, Value as ExternalValue};
 use crate::focus_tracker::NavigationDirection;
@@ -1354,6 +1356,26 @@ impl Player {
                     }
                     if let InputEvent::Ime(ime) = &event {
                         text.ime(ime.clone(), context);
+                    }
+                } else if let InputEvent::TextControl { code } = &event {
+                    let event_type = match code {
+                        TextControlCode::SelectAll => Some("selectAll"),
+                        TextControlCode::Copy => Some("copy"),
+                        TextControlCode::Cut => Some("cut"),
+                        TextControlCode::Paste => Some("paste"),
+                        _ => None,
+                    };
+                    if let Some(event_type) = event_type
+                        && let Some(focus) = context.focus_tracker.get()
+                    {
+                        let target = focus.as_displayobject();
+                        if target.movie().is_action_script_3()
+                            && let Some(target_object) = target.object2()
+                        {
+                            let edit_event =
+                                Avm2EventObject::bare_event(context, event_type, true, true);
+                            Avm2::dispatch_event(context, edit_event, target_object.into());
+                        }
                     }
                 } else if let InputEvent::TextInput { codepoint } = &event
                     && let Some(focus) = context.focus_tracker.get()

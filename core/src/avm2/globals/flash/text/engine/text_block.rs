@@ -1,7 +1,10 @@
 use crate::avm2::Avm2;
 use crate::avm2::Avm2StrRepresentable;
 use crate::avm2::activation::Activation;
-use crate::avm2::error::{Error, Error2004Type, make_error_2004, make_error_2008, make_error_2175};
+use crate::avm2::error::{
+    Error, Error2004Type, Error2006Type, make_error_2004, make_error_2006, make_error_2008,
+    make_error_2175,
+};
 use crate::avm2::function::FunctionArgs;
 use crate::avm2::globals::flash::display::display_object::initialize_for_allocator;
 use crate::avm2::object::{ContentElementObject, ElementData, VectorObject};
@@ -12,6 +15,7 @@ use crate::fte::{TextBaselineValue, TextLineCreationResultValue, TextRotationVal
 use crate::html::{FormatSpans, TextFormat, TextSpan};
 use crate::string::{WStr, WString};
 use crate::{avm2_stub_getter, avm2_stub_setter};
+use unicode_segmentation::UnicodeSegmentation;
 
 pub use crate::avm2::object::text_block_allocator;
 
@@ -428,6 +432,64 @@ pub fn release_lines<'gc>(
     Ok(Value::Undefined)
 }
 
+/// FTE atom boundaries are extended grapheme cluster boundaries in the
+/// TextBlock's UTF-16 character coordinates. TLF uses these for deleting and
+/// moving across combining sequences without splitting them.
+fn atom_boundaries<'gc>(
+    activation: &mut Activation<'_, 'gc>,
+    this: Value<'gc>,
+    args: FunctionArgs<'_, 'gc>,
+) -> Result<(Vec<usize>, usize), Error<'gc>> {
+    let block = this.as_object().unwrap().as_text_block_object().unwrap();
+    let content = block
+        .content()
+        .ok_or_else(|| make_error_2006(activation, Error2006Type::RangeError))?;
+    let spans = get_spans_from_content(content).map_err(|_| make_error_2175(activation))?;
+    let text = spans.text().to_utf8_lossy();
+    let length = spans.text().len();
+    let index = usize::try_from(args.get_i32(0))
+        .map_err(|_| make_error_2006(activation, Error2006Type::RangeError))?;
+    if index > length {
+        return Err(make_error_2006(activation, Error2006Type::RangeError));
+    }
+
+    let mut boundaries = vec![0];
+    let mut position = 0;
+    for grapheme in text.graphemes(true) {
+        position += grapheme.encode_utf16().count();
+        boundaries.push(position);
+    }
+    Ok((boundaries, index))
+}
+
+pub fn find_previous_atom_boundary<'gc>(
+    activation: &mut Activation<'_, 'gc>,
+    this: Value<'gc>,
+    args: FunctionArgs<'_, 'gc>,
+) -> Result<Value<'gc>, Error<'gc>> {
+    let (boundaries, index) = atom_boundaries(activation, this, args)?;
+    let boundary = boundaries
+        .into_iter()
+        .take_while(|boundary| *boundary < index)
+        .last()
+        .unwrap_or(0);
+    Ok((boundary as i32).into())
+}
+
+pub fn find_next_atom_boundary<'gc>(
+    activation: &mut Activation<'_, 'gc>,
+    this: Value<'gc>,
+    args: FunctionArgs<'_, 'gc>,
+) -> Result<Value<'gc>, Error<'gc>> {
+    let (boundaries, index) = atom_boundaries(activation, this, args)?;
+    let boundary = boundaries
+        .iter()
+        .copied()
+        .find(|boundary| *boundary > index)
+        .unwrap_or_else(|| *boundaries.last().unwrap_or(&0));
+    Ok((boundary as i32).into())
+}
+
 pub fn do_create_text_line<'gc>(
     activation: &mut Activation<'_, 'gc>,
     this: Value<'gc>,
@@ -499,7 +561,7 @@ pub fn do_create_text_line<'gc>(
     let text_line = if let Some(line) = line_to_use {
         // `TextLine.recreateTextLine` is the caller: completely reset the
         // properties of the passed line and use it.
-        line.reset_properties(activation.gc());
+        line.reset_properties(activation.context);
         line
     } else {
         // `TextLine.createTextLine` is the caller: create a new `TextLine`.

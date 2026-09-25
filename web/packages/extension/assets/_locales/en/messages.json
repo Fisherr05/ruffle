@@ -59,6 +59,12 @@
     "device_font_renderer_embedded": {
         "message": "Embedded"
     },
+    "settings_physical_pixel_scaling": {
+        "message": "Draw full-page Flash pixels at physical size (legacy plugins)"
+    },
+    "settings_text_cursor_at_end_on_click": {
+        "message": "Move text cursor to the end on click in full-page Flash"
+    },
     "settings_advanced_options": {
         "message": "Advanced Options"
     },

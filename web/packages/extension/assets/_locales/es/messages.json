@@ -59,6 +59,12 @@
     "device_font_renderer_embedded": {
         "message": "Embebido"
     },
+    "settings_physical_pixel_scaling": {
+        "message": "Dibujar Flash de página completa a tamaño físico (plugins antiguos)"
+    },
+    "settings_text_cursor_at_end_on_click": {
+        "message": "Mover el cursor de texto al final al hacer clic en Flash de página completa"
+    },
     "settings_advanced_options": {
         "message": "Opciones avanzadas"
     },

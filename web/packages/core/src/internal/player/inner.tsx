@@ -152,6 +152,8 @@ export class InnerPlayer {
     private readonly shadow: ShadowRoot;
     private readonly dynamicStyles: HTMLStyleElement;
     private readonly container: HTMLElement;
+    private readonly physicalPixelResizeObserver: ResizeObserver;
+    private savedScrollbarWidth: { html: string; body: string } | null = null;
     private readonly playButton: HTMLElement;
     private readonly unmuteOverlay: HTMLElement;
     private readonly splashScreen: HTMLElement;
@@ -228,6 +230,34 @@ export class InnerPlayer {
             "dynamic-styles",
         ) as HTMLStyleElement;
         this.container = this.shadow.getElementById("container")!;
+        this.container.addEventListener("pointerup", (event) => {
+            if (
+                !this.loadedConfig?.textCursorAtEndOnClick ||
+                !this.isFullPageFlashDocument() ||
+                event.button !== 0 ||
+                !(event.target instanceof HTMLCanvasElement) ||
+                getComputedStyle(event.target).cursor === "pointer"
+            ) {
+                return;
+            }
+
+            // The canvas has already delivered pointerup to the movie. Collapse
+            // any focus-time selection before the next input event arrives.
+            for (const type of ["keydown", "keyup"]) {
+                window.dispatchEvent(
+                    new KeyboardEvent(type, {
+                        key: "End",
+                        code: "End",
+                        bubbles: true,
+                        cancelable: true,
+                    }),
+                );
+            }
+        });
+        this.physicalPixelResizeObserver = new ResizeObserver(() =>
+            this.updatePhysicalPixelScaling(),
+        );
+        this.physicalPixelResizeObserver.observe(this.element);
         this.playButton = this.shadow.getElementById("play-button")!;
         this.playButton.addEventListener("click", () => this.play());
 
@@ -849,6 +879,18 @@ export class InnerPlayer {
      * Destroys the currently running instance of Ruffle.
      */
     destroy(): void {
+        if (this.savedScrollbarWidth) {
+            document.documentElement.style.scrollbarWidth =
+                this.savedScrollbarWidth.html;
+            if (document.body) {
+                document.body.style.scrollbarWidth =
+                    this.savedScrollbarWidth.body;
+            }
+            this.savedScrollbarWidth = null;
+        }
+        if (!this.element.isConnected) {
+            this.physicalPixelResizeObserver.disconnect();
+        }
         if (this.instance) {
             this.stopBackgroundTick();
             this.instance.destroy();
@@ -964,6 +1006,7 @@ export class InnerPlayer {
         }
 
         try {
+            this.physicalPixelResizeObserver.observe(this.element);
             this.loadedConfig = {
                 ...DEFAULT_CONFIG,
                 // The default allowScriptAccess value for polyfilled elements is samedomain.
@@ -979,6 +1022,7 @@ export class InnerPlayer {
                 ...this.config,
                 ...options,
             };
+            this.updatePhysicalPixelScaling();
 
             // Pre-emptively set background color of container while Ruffle/SWF loads.
             if (
@@ -990,6 +1034,7 @@ export class InnerPlayer {
             }
 
             await this.ensureFreshInstance();
+            this.hideFullPageFlashScrollbars();
 
             if ("url" in options) {
                 console.log(`Loading SWF file ${options.url}`);
@@ -1014,6 +1059,53 @@ export class InnerPlayer {
             this.panic(err);
             throw err;
         }
+    }
+
+    /** Keep the Flash viewport in physical pixels while the host fills its CSS box. */
+    private updatePhysicalPixelScaling(): void {
+        const ratio =
+            this.loadedConfig?.physicalPixelScaling &&
+            (!isExtension || this.isFullPageFlashDocument())
+                ? window.devicePixelRatio
+                : 1;
+        const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+        this.container.style.width =
+            scale === 1 ? "" : `${this.element.clientWidth * scale}px`;
+        this.container.style.height =
+            scale === 1 ? "" : `${this.element.clientHeight * scale}px`;
+        this.container.style.transformOrigin = "top left";
+        this.container.style.transform = `scale(${1 / scale})`;
+    }
+
+    private isFullPageFlashDocument(): boolean {
+        return (
+            !!document.body &&
+            this.element.parentElement === document.body &&
+            this.element.getAttribute("width") === "100%" &&
+            this.element.getAttribute("height") === "100%" &&
+            [...document.body.children].every(
+                (child) =>
+                    child === this.element ||
+                    ["SCRIPT", "STYLE", "NOSCRIPT"].includes(child.tagName) ||
+                    getComputedStyle(child).display === "none",
+            )
+        );
+    }
+
+    private hideFullPageFlashScrollbars(): void {
+        if (
+            this.savedScrollbarWidth ||
+            !this.loadedConfig?.physicalPixelScaling ||
+            !this.isFullPageFlashDocument()
+        ) {
+            return;
+        }
+        this.savedScrollbarWidth = {
+            html: document.documentElement.style.scrollbarWidth,
+            body: document.body.style.scrollbarWidth,
+        };
+        document.documentElement.style.scrollbarWidth = "none";
+        document.body.style.scrollbarWidth = "none";
     }
 
     /**

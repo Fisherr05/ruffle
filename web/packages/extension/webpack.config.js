@@ -11,7 +11,11 @@ import CopyPlugin from "copy-webpack-plugin";
 function transformManifest(content, env) {
     const manifest = json5.parse(content.toString());
 
-    let packageVersion = process.env["npm_package_version"];
+    let packageVersion =
+        process.env["npm_package_version"] ||
+        JSON.parse(
+            fs.readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+        ).version;
     let versionChannel = process.env["CFG_RELEASE_CHANNEL"] || "local";
     let version4 = process.env["VERSION4"];
     let firefoxExtensionId =
@@ -42,6 +46,15 @@ function transformManifest(content, env) {
     // The extension marketplaces require the version to monotonically increase
     // and to be in the format of A.B.C.D.
     manifest.version = version4 ? version4 : packageVersion;
+    const versionParts = manifest.version?.split(".");
+    if (
+        !versionParts ||
+        versionParts.length < 1 ||
+        versionParts.length > 4 ||
+        versionParts.some((part) => !/^\d+$/.test(part) || Number(part) > 65535)
+    ) {
+        throw new Error(`Invalid extension version: ${manifest.version}`);
+    }
 
     if (env["firefox"]) {
         manifest.browser_specific_settings = {

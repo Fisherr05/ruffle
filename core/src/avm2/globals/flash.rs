@@ -1,6 +1,7 @@
 //! `flash` namespace
 
 pub mod crypto;
+pub mod desktop;
 pub mod display;
 #[expect(non_snake_case)]
 pub mod display3D;

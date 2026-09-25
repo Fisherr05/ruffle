@@ -197,6 +197,8 @@ function isXMLDocument(): boolean {
     await sendMessageToPage({
         type: "load",
         config: {
+            physicalPixelScaling: options.physicalPixelScaling,
+            textCursorAtEndOnClick: options.textCursorAtEndOnClick,
             ...(window.location.hostname === "ecuapass.aduana.gob.ec"
                 ? { deviceFontRenderer: Config.DeviceFontRenderer.Canvas }
                 : {}),

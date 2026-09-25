@@ -1,5 +1,4 @@
 package flash.desktop {
-    import __ruffle__.stub_getter;
     import __ruffle__.stub_method;
 
     import flash.system.System;
@@ -16,37 +15,42 @@ package flash.desktop {
         }
 
         public function get formats():Array {
-            stub_getter("flash.desktop.Clipboard", "formats");
-            return new Array();
+            return hasText() ? [ClipboardFormats.TEXT_FORMAT] : [];
         }
 
         public function clear():void {
-            stub_method("flash.desktop.Clipboard", "clear");
+            System.setClipboard("");
         }
 
         public function clearData(format:String):void {
-            stub_method("flash.desktop.Clipboard", "clearData");
+            if (format == ClipboardFormats.TEXT_FORMAT) {
+                clear();
+            }
         }
 
         public function getData(
             format:String,
             transferMode:String = ClipboardTransferMode.ORIGINAL_PREFERRED
         ):Object {
-            stub_method("flash.desktop.Clipboard", "getData");
+            if (format == ClipboardFormats.TEXT_FORMAT && hasText()) {
+                return getText();
+            }
             return null;
         }
 
         public function hasFormat(format:String):Boolean {
-            stub_method("flash.desktop.Clipboard", "hasFormat");
-            return false;
+            return format == ClipboardFormats.TEXT_FORMAT && hasText();
         }
 
+        private native function getText():String;
+        private native function hasText():Boolean;
+
         public function setData(format:String, data:Object, serializable:Boolean = true):Boolean {
-            stub_method("flash.desktop.Clipboard", "setData");
             if (format == ClipboardFormats.TEXT_FORMAT) {
                 System.setClipboard(data);
                 return true;
             }
+            stub_method("flash.desktop.Clipboard", "setData");
             return false;
         }
 
