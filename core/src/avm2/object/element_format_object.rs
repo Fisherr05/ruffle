@@ -259,9 +259,6 @@ impl<'gc> ElementFormatObject<'gc> {
         let bold = fd.font_weight() == FontWeightValue::Bold;
         let italic = fd.font_posture() == FontPostureValue::Italic;
 
-        // TODO: Support setting `is_device_font` for individual `TextFormat`s
-        let _is_device_font = fd.font_lookup() == FontLookupValue::Device;
-
         TextFormat {
             color: Some(self.color()),
             size: Some(self.font_size()),
@@ -270,6 +267,10 @@ impl<'gc> ElementFormatObject<'gc> {
             italic: Some(italic),
             ..TextFormat::default()
         }
+    }
+
+    pub fn uses_device_font(self) -> bool {
+        self.font_description().font_lookup() == FontLookupValue::Device
     }
 }
 

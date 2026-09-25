@@ -9,10 +9,6 @@ package flash.text.engine {
     import flash.geom.Rectangle;
     import flash.ui.ContextMenu;
 
-    // FIXME: None of the DisplayObjectContainer methods actually work on
-    // the TextLine class in Ruffle, despite the methods working fine in FP-
-    // however, it's unlikely that SWFs will actually attempt to add children
-    // to a TextLine.
     [Ruffle(Abstract)]
     [API("662")]
     public final class TextLine extends DisplayObjectContainer {
@@ -28,10 +24,7 @@ package flash.text.engine {
 
         public native function get textBlock():TextBlock;
 
-        public function get ascent():Number {
-            stub_getter("flash.text.engine.TextLine", "ascent");
-            return 12.0;
-        }
+        public native function get ascent():Number;
 
         [API("670")]
         public function get totalAscent():Number {
@@ -39,10 +32,7 @@ package flash.text.engine {
             return 12.0;
         }
 
-        public function get descent():Number {
-            stub_getter("flash.text.engine.TextLine", "descent");
-            return 3.0;
-        }
+        public native function get descent():Number;
 
         [API("670")]
         public function get totalDescent():Number {
@@ -51,8 +41,7 @@ package flash.text.engine {
         }
 
         public function get unjustifiedTextWidth():Number {
-            stub_getter("flash.text.engine.TextLine", "unjustifiedTextWidth");
-            return this.specifiedWidth;
+            return this.textWidth;
         }
 
         public native function get textWidth():Number;
@@ -81,10 +70,7 @@ package flash.text.engine {
 
         public native function get hasTabs():Boolean;
 
-        public function getAtomIndexAtPoint(stageX:Number, stageY:Number):int {
-            stub_method("flash.text.engine.TextLine", "getAtomIndexAtPoint");
-            return -1;
-        }
+        public native function getAtomIndexAtPoint(stageX:Number, stageY:Number):int;
 
         public function getAtomIndexAtCharIndex(charIndex:int):int {
             stub_method("flash.text.engine.TextLine", "getAtomIndexAtCharIndex");
@@ -100,10 +86,7 @@ package flash.text.engine {
             return 0;
         }
 
-        public function getAtomBounds(index:int):Rectangle {
-            stub_method("flash.text.engine.TextLine", "getAtomBounds");
-            return new Rectangle(0, 0, 0, 0);
-        }
+        public native function getAtomBounds(index:int):Rectangle;
 
         public function getAtomCenter(index:int):Number {
             stub_method("flash.text.engine.TextLine", "getAtomCenter");

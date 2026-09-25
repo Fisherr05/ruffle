@@ -503,46 +503,10 @@ pub fn deserialize_value_impl<'gc>(
             dict_obj.into()
         }
         AmfValue::Custom(elements, _, class) => {
-            // Flex's ArrayCollection writes its source through IExternalizable.
-            // The flash-lso decoder exposes that value as `data`, while the
-            // ActionScript class expects it to be assigned to `source`.
-            let mut fields = if class
-                .as_ref()
-                .is_some_and(|class| class.name == "flex.messaging.io.ArrayCollection")
-            {
-                elements
-                    .iter()
-                    .map(|element| Element {
-                        name: if element.name == "data" {
-                            "source".to_owned()
-                        } else {
-                            element.name.clone()
-                        },
-                        value: element.value.clone(),
-                    })
-                    .collect()
-            } else {
-                elements.clone()
-            };
-            for field in elements {
-                if let Some(name) = field.name.strip_suffix("Bytes")
-                    && let AmfValue::ByteArray(bytes) = field.value.as_ref()
-                    && bytes.len() == 16
-                {
-                    let mut uuid = String::with_capacity(36);
-                    for (index, byte) in bytes.iter().enumerate() {
-                        if matches!(index, 4 | 6 | 8 | 10) {
-                            uuid.push('-');
-                        }
-                        use std::fmt::Write;
-                        write!(uuid, "{byte:02X}").unwrap();
-                    }
-                    fields.push(Element {
-                        name: name.to_owned(),
-                        value: Rc::new(AmfValue::String(uuid)),
-                    });
-                }
-            }
+            let fields = externalizable_fields_for_actionscript(
+                elements,
+                class.as_ref().map(|class| class.name.as_str()),
+            );
             let object = AmfValue::Object(ObjectId::INVALID, fields, class.clone());
             deserialize_value_impl(activation, &object, object_map)?
         }
@@ -566,6 +530,84 @@ pub fn deserialize_value_impl<'gc>(
             }
         }
     })
+}
+
+fn externalizable_fields_for_actionscript(
+    elements: &[Element],
+    class_name: Option<&str>,
+) -> Vec<Element> {
+    // Flex's ArrayCollection writes `data`, while its ActionScript class exposes `source`.
+    let mut fields: Vec<Element> = elements
+        .iter()
+        .map(|element| Element {
+            name: if class_name == Some("flex.messaging.io.ArrayCollection")
+                && element.name == "data"
+            {
+                "source".to_owned()
+            } else {
+                element.name.clone()
+            },
+            value: element.value.clone(),
+        })
+        .collect();
+
+    for field in elements {
+        if let Some(name) = field.name.strip_suffix("Bytes")
+            && let AmfValue::ByteArray(bytes) = field.value.as_ref()
+            && bytes.len() == 16
+        {
+            let mut uuid = String::with_capacity(36);
+            for (index, byte) in bytes.iter().enumerate() {
+                if matches!(index, 4 | 6 | 8 | 10) {
+                    uuid.push('-');
+                }
+                use std::fmt::Write;
+                write!(uuid, "{byte:02X}").unwrap();
+            }
+            fields.push(Element {
+                name: name.to_owned(),
+                value: Rc::new(AmfValue::String(uuid)),
+            });
+        }
+    }
+
+    if class_name == Some("DSK") {
+        // AcknowledgeMessageExt is sealed. Its byte forms are an internal part
+        // of IExternalizable and must not be assigned as public properties.
+        fields.retain(|field| {
+            !matches!(
+                field.name.as_str(),
+                "clientIdBytes" | "messageIdBytes" | "correlationIdBytes"
+            )
+        });
+    }
+
+    fields
+}
+
+#[cfg(test)]
+mod externalizable_tests {
+    use super::*;
+
+    #[test]
+    fn flex_acknowledgement_uses_string_ids_without_assigning_private_bytes() {
+        let bytes = Rc::new(AmfValue::ByteArray((0..16).collect()));
+        let fields = ["clientIdBytes", "messageIdBytes", "correlationIdBytes"]
+            .into_iter()
+            .map(|name| Element {
+                name: name.to_owned(),
+                value: bytes.clone(),
+            })
+            .collect::<Vec<_>>();
+        let fields = externalizable_fields_for_actionscript(&fields, Some("DSK"));
+        assert_eq!(fields.len(), 3);
+        for field in &fields {
+            assert!(!field.name.ends_with("Bytes"));
+            assert!(
+                matches!(field.value.as_ref(), AmfValue::String(value) if value == "00010203-0405-0607-0809-0A0B0C0D0E0F")
+            );
+        }
+    }
 }
 
 /// Deserializes a Lso into an object containing the properties stored

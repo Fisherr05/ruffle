@@ -10,6 +10,7 @@ use crate::display_object::avm1_button::Avm1Button;
 use crate::display_object::loader_display::LoaderDisplay;
 use crate::display_object::movie_clip::MovieClip;
 use crate::display_object::stage::Stage;
+use crate::display_object::text_line::TextLine;
 use crate::display_object::{Depth, DisplayObject, TDisplayObject, TInteractiveObject};
 use crate::focus_tracker::TabOrder;
 use crate::string::WStr;
@@ -122,6 +123,7 @@ pub fn dispatch_added_event<'gc>(
         Avm1Button(Avm1Button<'gc>),
         MovieClip(MovieClip<'gc>),
         LoaderDisplay(LoaderDisplay<'gc>),
+        TextLine(TextLine<'gc>),
     }
 )]
 pub trait TDisplayObjectContainer<'gc>:
@@ -613,6 +615,7 @@ impl<'gc> From<DisplayObjectContainer<'gc>> for DisplayObject<'gc> {
             DisplayObjectContainer::Avm1Button(o) => DisplayObject::Avm1Button(o),
             DisplayObjectContainer::MovieClip(o) => DisplayObject::MovieClip(o),
             DisplayObjectContainer::LoaderDisplay(o) => DisplayObject::LoaderDisplay(o),
+            DisplayObjectContainer::TextLine(o) => DisplayObject::TextLine(o),
         }
     }
 }

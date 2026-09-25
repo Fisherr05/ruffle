@@ -478,7 +478,7 @@ pub fn do_create_text_line<'gc>(
         return Ok(Value::Null);
     }
 
-    let next_position = next_line_break(text, previous_position);
+    let mut next_position = next_line_break(text, previous_position);
 
     if text.is_empty() || next_position == text.len() && previous_position == next_position {
         // No more text.
@@ -517,8 +517,42 @@ pub fn do_create_text_line<'gc>(
         .span(0)
         .expect("Non-empty text should have at least one span")
         .get_text_format();
+    apply_format(
+        activation,
+        fallback,
+        format.clone(),
+        first_font_is_device(content).unwrap_or(false),
+        width < 1_000_000.0,
+    );
 
-    apply_format(activation, fallback, format, line_index);
+    // An FTE TextLine represents exactly one laid-out line. The EditText fallback
+    // can wrap by itself, but Flex needs each wrapped line as a separate TextLine
+    // so that it can position and clip the lines independently.
+    if width < 1_000_000.0 {
+        if let Some(next_line_offset) = fallback.line_offset(1) {
+            if next_line_offset > 0 && next_line_offset < subtext.len() {
+                next_position = previous_position + next_line_offset;
+                fallback.set_text(&text[previous_position..next_position], activation.context);
+                apply_format(
+                    activation,
+                    fallback,
+                    format,
+                    first_font_is_device(content).unwrap_or(false),
+                    true,
+                );
+            }
+        }
+    }
+
+    if width >= 1_000_000.0 {
+        // Flex uses a very large width to measure intrinsic text. Wrapping the
+        // EditText fallback here creates a spurious one-character first line.
+        let ink_width = fallback.measure_text(activation.context).0.to_pixels();
+        if ink_width.is_finite() {
+            // EditText reserves two pixels on each side for its own gutter.
+            fallback.set_width(activation.context, ink_width + 4.0);
+        }
+    }
 
     // FIXME: This needs to use `intrinsic_bounds` to measure the width
     // of the provided text, and set the width of the EditText to that.
@@ -526,7 +560,7 @@ pub fn do_create_text_line<'gc>(
 
     text_line.set_text_block(Some(block), activation.gc());
     text_line.set_specified_width(width);
-    text_line.set_raw_text_length(subtext.len() as u32);
+    text_line.set_raw_text_length((next_position - previous_position) as u32);
     text_line.set_begin_index(previous_position as u32);
     text_line.set_end_index(next_position as u32);
     text_line.set_line_index(line_index);
@@ -639,14 +673,26 @@ fn next_line_break(text: &WStr, start: usize) -> usize {
     }
 }
 
+fn first_font_is_device(content: ContentElementObject<'_>) -> Option<bool> {
+    match &*content.element_data() {
+        ElementData::Text { text: Some(_) } => content
+            .element_format()
+            .map(|format| format.uses_device_font()),
+        ElementData::Group { elements } => elements
+            .iter()
+            .find_map(|element| first_font_is_device(*element)),
+        _ => None,
+    }
+}
+
 fn apply_format<'gc>(
     activation: &mut Activation<'_, 'gc>,
     edit_text: EditText<'gc>,
     format: TextFormat,
-    line_index: u32,
+    is_device_font: bool,
+    should_wrap: bool,
 ) {
-    // TODO: Handle device font/non-device font properly
-    edit_text.set_is_device_font(activation.context, false);
+    edit_text.set_is_device_font(activation.context, is_device_font);
     edit_text.set_text_format(
         0,
         edit_text.text_length(),
@@ -655,10 +701,9 @@ fn apply_format<'gc>(
     );
     edit_text.set_new_text_format(format);
 
-    edit_text.set_word_wrap(true, activation.context);
+    edit_text.set_word_wrap(should_wrap, activation.context);
 
     let measured_text = edit_text.measure_text(activation.context);
 
     edit_text.set_height(activation.context, measured_text.1.to_pixels());
-    edit_text.set_y(measured_text.1 * line_index as i32);
 }

@@ -5,6 +5,7 @@ use crate::avm2::StageObject as Avm2StageObject;
 use crate::avm2::object::TextBlockObject;
 use crate::backend::ui::MouseCursor;
 use crate::context::{RenderContext, UpdateContext};
+use crate::display_object::container::{ChildContainer, TDisplayObjectContainer};
 use crate::display_object::interactive::{InteractiveObjectBase, TInteractiveObject};
 use crate::display_object::{
     Avm2MousePick, BoundsMode, DisplayObjectBase, EditText, InteractiveObject,
@@ -16,10 +17,11 @@ use crate::tag_utils::SwfMovie;
 use crate::vminterface::Instantiator;
 use core::fmt;
 use gc_arena::barrier::unlock;
-use gc_arena::lock::Lock;
+use gc_arena::lock::{Lock, RefLock};
 use gc_arena::{Collect, Gc, Mutation};
 use ruffle_common::utils::HasPrefixField;
-use std::cell::Cell;
+use ruffle_render::transform::Transform;
+use std::cell::{Cell, Ref, RefMut};
 use std::sync::Arc;
 use swf::Twips;
 
@@ -40,6 +42,7 @@ impl fmt::Debug for TextLine<'_> {
 #[repr(C, align(8))]
 pub struct TextLineData<'gc> {
     base: InteractiveObjectBase<'gc>,
+    container: RefLock<ChildContainer<'gc>>,
     avm2_object: Lock<Option<Avm2StageObject<'gc>>>,
     fallback: EditText<'gc>,
     #[collect(require_static)]
@@ -72,6 +75,7 @@ impl<'gc> TextLine<'gc> {
             context.gc(),
             TextLineData {
                 base: Default::default(),
+                container: RefLock::new(ChildContainer::new(&movie)),
                 avm2_object: Lock::new(None),
                 fallback,
                 movie,
@@ -160,6 +164,21 @@ impl<'gc> TextLine<'gc> {
 
     pub fn fallback(self) -> EditText<'gc> {
         self.0.fallback
+    }
+
+    fn baseline_offset(self) -> Twips {
+        self.0
+            .fallback
+            .line_metrics(0)
+            .map_or(Twips::ZERO, |metrics| metrics.height)
+    }
+
+    pub fn atom_bounds(self, index: usize) -> Option<Rectangle<Twips>> {
+        if index >= self.raw_text_length() as usize {
+            return None;
+        }
+        let bounds = self.0.fallback.char_bounds(index)?;
+        Some(Matrix::translate(Twips::ZERO, -self.baseline_offset()) * bounds)
     }
 
     pub fn validity(self) -> TextLineValidity<'gc> {
@@ -281,11 +300,17 @@ impl<'gc> TDisplayObject<'gc> for TextLine<'gc> {
     fn replace_with(self, _context: &mut UpdateContext<'gc>, _id: CharacterId) {}
 
     fn render_self(self, context: &mut RenderContext<'_, 'gc>) {
+        context.transform_stack.push(&Transform {
+            matrix: Matrix::translate(Twips::ZERO, -self.baseline_offset()),
+            ..Default::default()
+        });
         self.0.fallback.render_self(context);
+        context.transform_stack.pop();
+        self.render_children(context);
     }
 
     fn self_bounds(self, mode: BoundsMode) -> Rectangle<Twips> {
-        self.0.fallback.self_bounds(mode)
+        Matrix::translate(Twips::ZERO, -self.baseline_offset()) * self.0.fallback.self_bounds(mode)
     }
 
     fn hit_test_shape(
@@ -369,5 +394,15 @@ impl<'gc> TInteractiveObject<'gc> for TextLine<'gc> {
 
     fn mouse_cursor(self, _context: &mut UpdateContext<'gc>) -> MouseCursor {
         MouseCursor::Arrow
+    }
+}
+
+impl<'gc> TDisplayObjectContainer<'gc> for TextLine<'gc> {
+    fn raw_container(&self) -> Ref<'_, ChildContainer<'gc>> {
+        self.0.container.borrow()
+    }
+
+    fn raw_container_mut(&self, gc_context: &Mutation<'gc>) -> RefMut<'_, ChildContainer<'gc>> {
+        unlock!(Gc::write(gc_context, self.0), TextLineData, container).borrow_mut()
     }
 }

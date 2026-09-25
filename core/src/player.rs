@@ -1344,15 +1344,35 @@ impl Player {
             }
 
             // KeyPress events take precedence over text input.
-            if !key_press_handled && let Some(text) = context.focus_tracker.get_as_edit_text() {
-                if let InputEvent::TextInput { codepoint } = &event {
-                    text.text_input((*codepoint).to_string(), context);
-                }
-                if let InputEvent::TextControl { code } = &event {
-                    text.text_control_input(*code, context);
-                }
-                if let InputEvent::Ime(ime) = &event {
-                    text.ime(ime.clone(), context);
+            if !key_press_handled {
+                if let Some(text) = context.focus_tracker.get_as_edit_text() {
+                    if let InputEvent::TextInput { codepoint } = &event {
+                        text.text_input((*codepoint).to_string(), context);
+                    }
+                    if let InputEvent::TextControl { code } = &event {
+                        text.text_control_input(*code, context);
+                    }
+                    if let InputEvent::Ime(ime) = &event {
+                        text.ime(ime.clone(), context);
+                    }
+                } else if let InputEvent::TextInput { codepoint } = &event
+                    && let Some(focus) = context.focus_tracker.get()
+                {
+                    let target = focus.as_displayobject();
+                    if target.movie().is_action_script_3()
+                        && let Some(target_object) = target.object2()
+                    {
+                        let mut activation = Avm2Activation::from_nothing(context);
+                        let text = AvmString::new_utf8(activation.gc(), &codepoint.to_string());
+                        let text_event = Avm2EventObject::text_event(
+                            &mut activation,
+                            "textInput",
+                            text,
+                            true,
+                            true,
+                        );
+                        Avm2::dispatch_event(activation.context, text_event, target_object.into());
+                    }
                 }
             }
 
