@@ -1190,7 +1190,29 @@ pub fn apply_standard_mask_and_scroll<'gc, F>(
 ) where
     F: FnOnce(&mut RenderContext<'_, 'gc>),
 {
-    let scroll_rect_matrix = if let Some(rect) = this.scroll_rect() {
+    let effective_scroll_rect = this.scroll_rect().map(|mut rect| {
+        // Spark RichText can clip a paragraph TextLine to a three-pixel strip.
+        // Keep the ActionScript scrollRect intact, but include the line's visual
+        // bounds when rendering that otherwise completely clipped text.
+        if rect.height() == Twips::from_pixels(3.0) {
+            if let Some(container) = this.as_container() {
+                for child in container.iter_render_list() {
+                    let Some(line) = child.as_text_line() else {
+                        continue;
+                    };
+                    if !line.fallback().text().contains(0x2029u16) {
+                        continue;
+                    }
+                    let bounds = line.local_bounds(BoundsMode::Engine);
+                    if bounds.y_min >= rect.y_min && bounds.y_min <= rect.y_max {
+                        rect.y_max = rect.y_max.max(bounds.y_max);
+                    }
+                }
+            }
+        }
+        rect
+    });
+    let scroll_rect_matrix = if let Some(rect) = effective_scroll_rect {
         let cur_transform = context.transform_stack.transform();
         // The matrix we use for actually drawing a rectangle for cropping purposes
         // Note that we do *not* apply the translation yet
@@ -1205,7 +1227,7 @@ pub fn apply_standard_mask_and_scroll<'gc, F>(
         None
     };
 
-    if let Some(rect) = this.scroll_rect() {
+    if let Some(rect) = effective_scroll_rect {
         // Translate everything that we render (including DisplayObject.mask)
         context.transform_stack.push(&Transform {
             matrix: Matrix::translate(-rect.x_min, -rect.y_min),

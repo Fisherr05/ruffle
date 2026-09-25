@@ -258,9 +258,13 @@ impl<'gc> ElementFormatObject<'gc> {
         let font = fd.font_name().as_wstr().into();
         let bold = fd.font_weight() == FontWeightValue::Bold;
         let italic = fd.font_posture() == FontPostureValue::Italic;
+        let mut color = self.color();
+        // ElementFormat.color is a uint; its high byte is preserved by the
+        // ActionScript property, but transparency comes from ElementFormat.alpha.
+        color.a = (self.alpha() * 255.0).round() as u8;
 
         TextFormat {
-            color: Some(self.color()),
+            color: Some(color),
             size: Some(self.font_size()),
             font: Some(font),
             bold: Some(bold),

@@ -529,8 +529,25 @@ pub fn do_create_text_line<'gc>(
     // can wrap by itself, but Flex needs each wrapped line as a separate TextLine
     // so that it can position and clip the lines independently.
     if width < 1_000_000.0 {
+        // `next_line_break` already includes the entire line separator. The
+        // EditText fallback can report an offset inside a CRLF pair, but FTE
+        // treats that pair as a single separator rather than two lines.
+        let display_len = if subtext.len() >= 2
+            && subtext.get(subtext.len() - 2) == Some(b'\r' as u16)
+            && subtext.get(subtext.len() - 1) == Some(b'\n' as u16)
+        {
+            subtext.len() - 2
+        } else if subtext
+            .get(subtext.len() - 1)
+            .is_some_and(|ch| matches!(ch, 0x0A | 0x0D | 0x2028 | 0x2029))
+        {
+            subtext.len() - 1
+        } else {
+            subtext.len()
+        };
+
         if let Some(next_line_offset) = fallback.line_offset(1) {
-            if next_line_offset > 0 && next_line_offset < subtext.len() {
+            if next_line_offset > 0 && next_line_offset < display_len {
                 next_position = previous_position + next_line_offset;
                 fallback.set_text(&text[previous_position..next_position], activation.context);
                 apply_format(

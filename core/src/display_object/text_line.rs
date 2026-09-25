@@ -155,7 +155,13 @@ impl<'gc> TextLine<'gc> {
     }
 
     pub fn measure_text(self, context: &mut UpdateContext<'gc>) -> (Twips, Twips) {
-        self.0.fallback.measure_text(context)
+        // A trailing paragraph separator creates an empty fallback line.
+        // FTE measures the TextLine itself, so use its first laid-out line.
+        self.0
+            .fallback
+            .line_metrics(0)
+            .map(|metrics| (metrics.width, metrics.height))
+            .unwrap_or_else(|| self.0.fallback.measure_text(context))
     }
 
     pub fn has_tabs(self) -> bool {
@@ -167,6 +173,12 @@ impl<'gc> TextLine<'gc> {
     }
 
     fn baseline_offset(self) -> Twips {
+        // Paragraph-terminated lines are positioned by TLF/Spark from their
+        // top edge; shifting their fallback by another line height hides them
+        // behind the parent's narrow RichText scrollRect.
+        if self.0.fallback.text().contains(0x2029u16) {
+            return Twips::ZERO;
+        }
         self.0
             .fallback
             .line_metrics(0)
